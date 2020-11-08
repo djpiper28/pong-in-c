@@ -4,10 +4,10 @@
 #include <pthread.h>
 #include <ncurses.h>
 
-#define MAX_X_VELOCITY 1
-#define MAX_Y_VELOCITY 1
-#define WIDTH 75
-#define HEIGHT 30
+#define MAX_X_VELOCITY 2
+#define MAX_Y_VELOCITY 2
+#define WIDTH 100
+#define HEIGHT 40
 #define PADDLE_WIDTH 2
 #define PADDLE_HEIGHT 8
 #define BALL_SIZE 2
@@ -57,26 +57,27 @@ void createInputReadingThread ( struct inputBufferStruct * bufferStruct ) {
 }
 
 void createAndPrintMatrix( int playerPaddleY, int aiPaddleY,
-  struct position ball, char * matrix, int score ) {
+  struct position ball, int score ) {
   clear();
 
   printw("Score: %i\n", score);
+  char c;
 
   for (int y = 0; y < HEIGHT; y++) {
     for (int x = 0; x < WIDTH; x++) {
       if (x < PADDLE_WIDTH
         && y <= playerPaddleY + PADDLE_HEIGHT && y >= playerPaddleY) {
-        matrix[x + y * WIDTH] = PADDLE_CHAR;
+        c = PADDLE_CHAR;
       } else if (x >= WIDTH - PADDLE_WIDTH
               && y <= aiPaddleY + PADDLE_HEIGHT && y >= aiPaddleY ) {
-        matrix[x + y * WIDTH] = PADDLE_CHAR;
+        c = PADDLE_CHAR;
       } else if (x >= ball.x && x < ball.x + BALL_SIZE
               && y >= ball.y && y < ball.y + BALL_SIZE) {
-        matrix[x + y * WIDTH] = BALL_CHAR;
+        c = BALL_CHAR;
       } else {
-        matrix[x + y * WIDTH] = BLANK_CHAR;
+        c = BLANK_CHAR;
       }
-      printw("%c", matrix[x + y * WIDTH]);
+      printw("%c", c);
     }
     printw("\n");
   }
@@ -89,8 +90,8 @@ int moveBall(int * xVelocity, int * yVelocity, struct position * ball,
   ball->y += *yVelocity;
 
   //Bounce off walls
-  if (ball->x + BALL_SIZE > WIDTH) {
-    ball->x = WIDTH - BALL_SIZE;
+  if (ball->x + BALL_SIZE > WIDTH - PADDLE_WIDTH) {
+    ball->x = WIDTH - BALL_SIZE - PADDLE_WIDTH;
     *xVelocity *= -1;
   } else if (ball->x < 0) {
     ball->x = 0;
@@ -115,6 +116,14 @@ int moveBall(int * xVelocity, int * yVelocity, struct position * ball,
       return 1;
     } else {
       *score += 1;
+      if(ball->y >= *playerPaddleY + PADDLE_HEIGHT / 4
+        && ball->y < *playerPaddleY + 3 * PADDLE_HEIGHT / 4) {
+          *xVelocity += 1;
+      } else if (*yVelocity > 0) {
+          *yVelocity += 1;
+      } else {
+          *yVelocity -= 1;
+      }
     }
   }
 
@@ -148,13 +157,13 @@ void movePaddles( struct inputBufferStruct * inputBuffer,
     }
   }
 
-  *aiPaddleY = ball->y - - BALL_SIZE / 2 - PADDLE_HEIGHT / 2;
+  *aiPaddleY = ball->y - BALL_SIZE / 2 - PADDLE_HEIGHT / 2;
 }
 
-void gameLoop ( char * matrix, struct inputBufferStruct * inputBuffer ) {
+void gameLoop ( struct inputBufferStruct * inputBuffer ) {
   int lost = 0, score = 0, playerPaddleY = 0, aiPaddleY = 0;
-  int xVelocity = MAX_X_VELOCITY;
-  int yVelocity = MAX_Y_VELOCITY;
+  int xVelocity = 1;
+  int yVelocity = 1;
 
   struct position ball = {WIDTH / 2, HEIGHT / 2};
 
@@ -163,17 +172,16 @@ void gameLoop ( char * matrix, struct inputBufferStruct * inputBuffer ) {
     lost = moveBall(&xVelocity, &yVelocity, &ball,
       &playerPaddleY, &aiPaddleY, &score);
 
-    createAndPrintMatrix(playerPaddleY, aiPaddleY, ball, matrix, score);
+    createAndPrintMatrix(playerPaddleY, aiPaddleY, ball, score);
 
     usleep(REFRESH_SPEED);
   }
 }
 
 int main () {
-  char * matrix = malloc(sizeof(char) * WIDTH * HEIGHT);
   char * inputBuffer = malloc(sizeof(char) * INPUT_BUFFER_SIZE);
 
-  if (matrix == 0 || inputBuffer == 0) {
+  if (inputBuffer == 0) {
     exit(1);
   }
 
@@ -184,9 +192,7 @@ int main () {
   noecho();
 
   createInputReadingThread(&bufferStruct);
-  gameLoop(matrix, &bufferStruct);
-
-  free(matrix);
+  gameLoop(&bufferStruct);
   free(inputBuffer);
 
   printw("\n");
