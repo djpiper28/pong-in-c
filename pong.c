@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <unistd.h>
 #include <ncurses.h>
 
 #define MAX_X_VELOCITY 1
